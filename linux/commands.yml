@@ -1,0 +1,212 @@
+---
+environment:
+- shell:
+    - source settings.env
+
+
+--- # dependencies-centos6.sh dependencies-ubuntu1404.sh
+dependencies:
+- os: centos6
+  repositories:
+    - http://download.zeroc.com/Ice/3.5/el6/zeroc-ice-el6.repo
+    - epel-release
+    - http://yum.postgresql.org/9.4/redhat/rhel-6-x86_64/pgdg-centos94-9.4-1.noarch.rpm
+  packages:
+    - unzip
+    - wget
+    - java-1.7.0-openjdk
+    - ice
+    - ice-python
+    - ice-servers
+    - python-pip
+    - python-devel
+    - numpy
+    - scipy
+    - python-matplotlib
+    - Cython
+    - gcc
+    - libjpeg-devel
+    - libpng-devel
+    - libtiff-devel
+    - zlib-devel
+    - hdf5-devel
+    - postgresql94-server
+    - postgresql94
+  pythonpip:
+    - pillow
+    - numexpr==1.4.2
+    - tables==2.4.0
+  shell:
+    - service postgresql-9.4 initdb
+    - sed -i.bak -re 's/^(host.*)ident/\1md5/' /var/lib/pgsql/9.4/data/pg_hba.conf
+    - chkconfig postgresql-9.4 on
+    - service postgresql-9.4 start
+
+- os: ubuntu1404
+  packages:
+    - unzip
+    - wget
+    - python-imaging
+    - python-matplotlib
+    - python-numpy
+    - python-pip
+    - python-scipy
+    - python-tables
+    - python-virtualenv
+    - openjdk-7-jre-headless
+    - ice-services
+    - python-zeroc-ice
+    - postgresql
+  shell:
+    - service postgresql start
+
+
+--- # system_setup.sh
+system-setup:
+- shell:
+    - useradd -m omero
+    - chmod a+X ~omero
+    - mkdir -p "$OMERO_DATA_DIR"
+    - chown omero "$OMERO_DATA_DIR"
+
+
+--- # setup_postgres.sh
+database-setup:
+- shell:
+    - echo "CREATE USER $OMERO_DB_USER PASSWORD '$OMERO_DB_PASS'" | su - postgres -c psql
+    - su - postgres -c "createdb -E UTF8 -O '$OMERO_DB_USER' '$OMERO_DB_NAME'"
+    - psql -P pager=off -h localhost -U "$OMERO_DB_USER" -l
+
+
+--- # setup_omero50.sh setup_omero51.sh setup_omero_apache.sh
+omero-setup:
+- user: omero
+
+- shell:
+    - source settings.env
+
+- omero: 5.0
+  shell:
+    - SERVER=http://downloads.openmicroscopy.org/latest/omero5.0/server-ice35.zip
+
+- omero: 5.1
+  shell:
+    - SERVER=http://downloads.openmicroscopy.org/latest/omero5.1/server-ice35.zip
+
+- shell:
+    - wget $SERVER
+    - unzip -q server-ice35.zip
+    - ln -s OMERO.server-*/ OMERO.server
+    - OMERO.server/bin/omero config set omero.data.dir "$OMERO_DATA_DIR"
+    - OMERO.server/bin/omero config set omero.db.name "$OMERO_DB_NAME"
+    - OMERO.server/bin/omero config set omero.db.user "$OMERO_DB_USER"
+    - OMERO.server/bin/omero config set omero.db.pass "$OMERO_DB_PASS"
+    - OMERO.server/bin/omero db script -f OMERO.server/db.sql "" "" "$OMERO_ROOT_PASS"
+    - psql -h localhost -U "$OMERO_DB_USER" "$OMERO_DB_NAME" < OMERO.server/db.sql
+
+- webserver: nginx
+  omero: 5.0
+  shell:
+    - OMERO.server/bin/omero web config nginx --system --http "$OMERO_WEB_PORT" > OMERO.server/nginx.conf.tmp
+
+- webserver: nginx
+  omero: 5.1
+  shell:
+    - OMERO.server/bin/omero web config nginx --http "$OMERO_WEB_PORT" > OMERO.server/nginx.conf.tmp
+
+- webserver: apache-2.2
+  shell:
+    - OMERO.server/bin/omero web config apache > OMERO.server/apache22.conf.tmp
+
+- webserver: apache-2.4
+  shell:
+    - OMERO.server/bin/omero web config apache-fcgi > OMERO.server/apache24.conf.tmp
+
+
+--- # setup_nginx_centos6.sh setup_nginx_centos6_selinux.sh setup_apache_centos6.sh
+webserver-setup:
+- webserver: nginx
+  os: centos6
+  shell:
+    - |
+      cat << EOF > /etc/yum.repos.d/nginx.repo
+      [nginx]
+      name=nginx repo
+      baseurl=http://nginx.org/packages/centos/\$releasever/\$basearch/
+      gpgcheck=0
+      enabled=1
+      EOF
+    - yum -y install nginx
+    - mv /etc/nginx/conf.d/default.conf /etc/nginx/conf.d/default.disabled
+    - cp ~omero/OMERO.server/nginx.conf.tmp /etc/nginx/conf.d/omero-web.conf
+#    - chkconfig nginx on
+    - service nginx start
+
+- webserver: nginx
+  os: ubuntu1404
+  shell:
+    - apt-get -y install nginx
+    - cp ~omero/OMERO.server/nginx.conf.tmp /etc/nginx/sites-available/omero-web
+    - rm /etc/nginx/sites-enabled/default
+    - ln -s /etc/nginx/sites-available/omero-web /etc/nginx/sites-enabled/
+    - service nginx start
+
+- webserver: apache-2.2
+  os: centos6
+  repositories:
+      - http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm
+  packages:
+      - httpd
+      - mod_fastcgi
+  shell:
+    - sed -i.omero 's/^\s*FastCgi/#&/' /etc/httpd/conf.d/fastcgi.conf
+    - cp ~omero/OMERO.server/apache.conf.tmp /etc/httpd/conf.d/omero-web.conf
+    - chkconfig httpd on
+    - service httpd start
+# Note you may want to disable the rpmforge repo after installing
+# mod_fastcgi by setting `enabled = 0` in /etc/yum.repos.d/rpmforge.repo
+
+- webserver: apache-2.2
+  os: ubuntu1404
+  error: Not implemented
+
+- webserver: apache-2.4
+  os: [centos6, ubuntu1404]
+  error: Not implemented
+
+
+--- # setup_omero_daemon_centos6.sh setup_omero_daemon_ubuntu1404.sh
+omerodaemon-setup:
+- shell:
+    - cp omero-init.d /etc/init.d/omero
+    - chmod a+x /etc/init.d/omero
+    - cp omero-web-init.d /etc/init.d/omero-web
+    - chmod a+x /etc/init.d/omero-web
+
+- os: centos6
+  shell:
+    - chkconfig --del omero
+    - chkconfig --add omero
+    - chkconfig --del omero-web
+    - chkconfig --add omero-web
+
+- os: ubuntu1404
+  shell:
+    - update-rc.d -f omero remove
+    - update-rc.d -f omero defaults 98 02
+    - update-rc.d -f omero-web remove
+    - update-rc.d -f omero-web defaults 98 02
+
+
+--- # setup_nginx_centos6_selinux.sh
+selinux-setup:
+- os: centos6
+  shell:
+    - if [ $(getenforce) != Disabled ]; then
+    -    yum -y install policycoreutils-python
+    -    setsebool -P httpd_read_user_content 1
+    -    setsebool -P httpd_enable_homedirs 1
+    -    semanage port -a -t http_port_t -p tcp 4080
+    - fi
+
+
