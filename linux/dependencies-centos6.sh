@@ -12,7 +12,7 @@ yum -y install \
 	ice ice-python ice-servers
 
 yum -y install \
-	python-pip python-devel \
+	python-pip python-devel python-virtualenv \
 	numpy scipy python-matplotlib Cython \
 	gcc \
 	libjpeg-devel \
