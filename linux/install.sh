@@ -14,7 +14,7 @@ for arg in "$@"; do
 	nginx|apache)
 		WEBSERVER="$arg"
 		;;
-	omero50|omero51)
+	omero51|omero51-merge)
 		OMEROVER="$arg"
 		;;
 	*)
