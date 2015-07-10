@@ -66,7 +66,7 @@ fi
 
 if [ $DISTRO = centos6 ]; then
 	if [ $WEBSERVER = apache ]; then
-		setup_omero_daemon_noweb_centos6.sh
+		bash -eux setup_omero_daemon_noweb_centos6.sh
 	else
 		bash -eux setup_omero_daemon_centos6.sh
 	fi
