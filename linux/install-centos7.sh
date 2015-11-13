@@ -10,7 +10,7 @@ for arg in "$@"; do
 	nginx|apache)
 		WEBSERVER="$arg"
 		;;
-	omero|omerodev|omerodevmerge)
+	omero|omerodev)
 		OMEROVER="$arg"
 		;;
 	*)
@@ -33,13 +33,8 @@ fi
 if [ $OMEROVER = omerodev ]; then
 	yum -y install python-virtualenv
 	yum clean all
-	su - omero -c "bash -eux setup_$OMEROVER.sh"
-elif [ $OMEROVER = omerodevmerge ]; then
-	yum -y install python-virtualenv
-	yum clean all
-	su - omero -c "bash -eux setup_$OMEROVER.sh merge"
 fi 
-
+su - omero -c "bash -eux setup_$OMEROVER.sh"
 
 if [ $WEBSERVER = nginx ]; then
 	bash -eux setup_nginx_centos7.sh
