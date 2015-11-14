@@ -39,7 +39,7 @@ su - omero -c "bash -eux setup_$OMEROVER.sh"
 if [ $WEBSERVER = nginx ]; then
 	bash -eux setup_nginx_centos7.sh
 else
-	su - omero -c "bash -eux setup_omero_apache.sh"
+	su - omero -c "bash -eux setup_omero_apache.sh apache24"
 	bash -eux setup_apache_centos7.sh
 fi
 
@@ -49,5 +49,5 @@ fi
 
 bash -eux setup_omero_daemon_centos7.sh
 
-systemctl start omero.service
-systemctl start omero-web.service
+#systemctl start omero.service
+#systemctl start omero-web.service
