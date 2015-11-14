@@ -4,7 +4,7 @@ set -e -u -x
 
 source settings.env
 
-WEBSERVER=apache24
+WEBSERVER=apache
 
 for arg in "$@"; do
 	case "$arg" in
